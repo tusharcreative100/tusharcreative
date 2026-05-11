@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> CRM PRO - Administrative Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-body: #f0f2f5;
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --primary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            --accent: #4e73df;
+            --sidebar-width: 260px;
+            --card-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            --purple: #6f42c1;
+            --success: #1cc88a;
+            --warning: #f6c23e;
+            --danger: #e74a3b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', 'Segoe UI', sans-serif; background: var(--bg-body); color: #444; overflow-x: hidden; }
+
+        #loginSection {
+            height: 100vh;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        .main-wrapper { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #1a1c23;
+            color: white;
+            position: fixed;
+            height: 100vh;
+            padding: 20px 0;
+            z-index: 100;
+        }
+        .sidebar-brand { 
+            padding: 0 25px 20px; 
+            font-size: 20px; 
+            font-weight: 800; 
+            border-bottom: 1px solid #333; 
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .sidebar-logo {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            margin: 10px auto;
+            display: block;
+            border-radius: 10px;
+        }
+
+        .nav-item {
+            padding: 12px 25px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.3s;
+            color: #b0b0b0;
+            font-size: 14px;
+            text-decoration: none;
+        }
+        .nav-item i { margin-right: 15px; width: 20px; }
+        .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.05); color: white; border-left: 4px solid var(--accent); }
+
+        .content-area {
+            flex-grow: 1;
+            margin-left: var(--sidebar-width);
+            padding: 30px;
+            width: calc(100% - var(--sidebar-width));
+        }
+
+        .top-bar {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 30px;
+        }
+        .search-box {
+            background: #f8f9fc;
+            border: 1px solid #e3e6f0;
+            padding: 10px 20px;
+            border-radius: 50px;
+            width: 350px;
+            display: flex;
+            align-items: center;
+        }
+        .search-box input { border: none; background: transparent; outline: none; margin-left: 10px; width: 100%; }
+
+        .external-links { display: flex; gap: 10px; }
+        .link-btn { 
+            padding: 8px 15px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-size: 13px; 
+            font-weight: 600; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+            transition: 0.3s;
+        }
+        .btn-gsheet { background: #e6f4ea; color: #1e8e3e; border: 1px solid #1e8e3e; }
+        .btn-gdrive { background: #feefc3; color: #f29900; border: 1px solid #f29900; }
+        .link-btn:hover { opacity: 0.8; transform: translateY(-2px); }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: var(--card-shadow);
+            border-left: 5px solid #ddd;
+        }
+        .stat-card h4 { font-size: 12px; text-transform: uppercase; color: #888; }
+        .stat-card .val { font-size: 24px; font-weight: bold; margin-top: 5px; }
+
+        .data-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .data-panel { background: white; border-radius: 15px; box-shadow: var(--card-shadow); overflow: hidden; height: 500px; display: flex; flex-direction: column; }
+        .panel-header {
+            padding: 15px 20px;
+            background: #f8f9fc;
+            border-bottom: 1px solid #e3e6f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-content { flex-grow: 1; overflow-y: auto; padding: 10px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fc; color: #888; font-size: 11px; text-transform: uppercase; padding: 12px 10px; text-align: left; }
+        td { padding: 12px 10px; border-bottom: 1px solid #f1f1f1; font-size: 13px; }
+        .del-btn { color: var(--danger); cursor: pointer; transition: 0.2s; }
+        .del-btn:hover { transform: scale(1.2); }
+
+        .btn-action { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 12px; }
+        .btn-excel { background: #1cc88a; color: white; }
+        
+        .form-card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: var(--card-shadow); }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        .input-group input, .input-group textarea { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; outline: none; }
+        .submit-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--accent); color: white; font-weight: bold; cursor: pointer; }
+
+        @media (max-width: 1024px) {
+            .stat-grid { grid-template-columns: 1fr 1fr; }
+            .data-grid { grid-template-columns: 1fr; }
+            .sidebar { width: 70px; }
+            .sidebar-brand, .sidebar-logo, .nav-item span { display: none; }
+            .content-area { margin-left: 70px; width: calc(100% - 70px); }
+            .search-box { width: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loginSection">
+    <div class="login-card">
+        <img src="https://i.ibb.co/R4bjpLpM/logo.png" style="width: 100px; margin-bottom: 20px; border-radius: 10px;">
+        <h2 style="margin-bottom: 10px; color: #1e3c72;">Office (MALA)</h2>
+        <p style="color: #666; margin-bottom: 30px;">Access Administrator Panel</p>
+        <div class="input-group" style="text-align: left;">
+            <label>Admin Email</label>
+            <input type="email" id="loginId" placeholder="email">
+        </div>
+        <div class="input-group" style="text-align: left;">
+            <label>Password</label>
+            <input type="password" id="loginPass" placeholder="password">
+        </div>
+        <button class="submit-btn" onclick="handleLogin()">Login to Dashboard</button>
+    </div>
+</div>
+
+<div id="appWrapper" class="main-wrapper" style="display: none;">
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <i class="fas fa-shield-alt"></i> CRM PRO
+        </div>
+        <img src="https://i.ibb.co/R4bjpLpM/logo.png" class="sidebar-logo" alt="Logo">
+        
+        <div class="nav-item active" onclick="switchTab(event, 'ADMIN')"><i class="fas fa-chart-line"></i> <span>Dashboard</span></div>
+        <div class="nav-item" onclick="switchTab(event, 'RECORD')"><i class="fas fa-folder-plus"></i> <span>Record Entry</span></div>
+        <div class="nav-item" onclick="switchTab(event, 'REGISTRY')"><i class="fas fa-id-card"></i> <span>Registry Entry</span></div>
+        <div class="nav-item" onclick="switchTab(event, 'DUE')"><i class="fas fa-file-invoice-dollar"></i> <span>Due Entry</span></div>
+        <div class="nav-item" onclick="switchTab(event, 'COLLECTION')"><i class="fas fa-hand-holding-usd"></i> <span>Collection</span></div>
+        
+        <a href="https://docs.google.com/spreadsheets" target="_blank" class="nav-item"><i class="fas fa-file-excel" style="color: #1e8e3e;"></i> <span>Google Sheets</span></a>
+        <a href="https://drive.google.com" target="_blank" class="nav-item"><i class="fab fa-google-drive" style="color: #f29900;"></i> <span>Google Drive</span></a>
+        
+        <div class="nav-item" onclick="switchTab(event, 'SETTINGS')"><i class="fas fa-user-cog"></i> <span>Settings</span></div>
+        <div class="nav-item" onclick="handleLogout()" style="margin-top: 30px; color: var(--danger);"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></div>
+    </div>
+
+    <div class="content-area">
+        <div class="top-bar">
+            <div class="search-box">
+                <i class="fas fa-search" style="color: #888;"></i>
+                <input type="text" id="masterSearch" placeholder="Search Name or Phone..." onkeyup="refreshAdmin()">
+            </div>
+            
+            <div class="external-links">
+                <a href="https://docs.google.com/spreadsheets" target="_blank" class="link-btn btn-gsheet">
+                    <i class="fas fa-file-excel"></i> Sheets
+                </a>
+                <a href="https://drive.google.com" target="_blank" class="link-btn btn-gdrive">
+                    <i class="fab fa-google-drive"></i> Drive
+                </a>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <input type="date" id="filterDate" onchange="refreshAdmin()" style="padding: 8px; border-radius: 8px; border: 1px solid #ddd;">
+                <div id="profileInfo" style="font-weight: 600; font-size: 14px; color: var(--accent);"></div>
+            </div>
+        </div>
+
+        <div id="section-ADMIN" class="tab-content" style="display: block;">
+            <div class="stat-grid">
+                <div class="stat-card" style="border-left-color: var(--purple);">
+                    <h4>Total Registry</h4>
+                    <div class="val" id="statRegistry">0</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--accent);">
+                    <h4>Total Record</h4>
+                    <div class="val" id="statRecord">0</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--warning);">
+                    <h4>Pending Due</h4>
+                    <div class="val" id="statDue">0</div>
+                </div>
+                <div class="stat-card" style="border-left-color: var(--success);">
+                    <h4>Collections</h4>
+                    <div class="val" id="statColl">0</div>
+                </div>
+            </div>
+
+            <div class="data-grid">
+                <div class="data-panel">
+                    <div class="panel-header">
+                        <span style="font-weight: bold;"><i class="fas fa-id-card"></i> REGISTRY DATA</span>
+                        <button class="btn-action btn-excel" onclick="exportToExcel('REGISTRY')">EXPORT</button>
+                    </div>
+                    <div class="panel-content">
+                        <table id="tableRegistry"><thead><tr><th>Name</th><th>Date</th><th>Phone</th><th></th></tr></thead><tbody></tbody></table>
+                    </div>
+                </div>
+                <div class="data-panel">
+                    <div class="panel-header">
+                        <span style="font-weight: bold;"><i class="fas fa-folder"></i> RECORD DATA</span>
+                        <button class="btn-action btn-excel" onclick="exportToExcel('RECORD')">EXPORT</button>
+                    </div>
+                    <div class="panel-content">
+                        <table id="tableRecord"><thead><tr><th>Name</th><th>Date</th><th>Phone</th><th></th></tr></thead><tbody></tbody></table>
+                    </div>
+                </div>
+                <div class="data-panel">
+                    <div class="panel-header">
+                        <span style="font-weight: bold;"><i class="fas fa-exclamation-circle"></i> DUE DATA</span>
+                        <button class="btn-action btn-excel" onclick="exportToExcel('DUE')">EXPORT</button>
+                    </div>
+                    <div class="panel-content">
+                        <table id="tableDue"><thead><tr><th>Name</th><th>Date</th><th>Phone</th><th>Amount</th><th></th></tr></thead><tbody></tbody></table>
+                    </div>
+                </div>
+                <div class="data-panel">
+                    <div class="panel-header">
+                        <span style="font-weight: bold;"><i class="fas fa-check-circle"></i> COLLECTIONS</span>
+                        <button class="btn-action btn-excel" onclick="exportToExcel('COLLECTION')">EXPORT</button>
+                    </div>
+                    <div class="panel-content">
+                        <table id="tableCollection"><thead><tr><th>Purpose</th><th>Date</th><th>Amount</th><th></th></tr></thead><tbody></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-RECORD" class="tab-content" style="display: none;">
+            <div class="form-card">
+                <h3><i class="fas fa-folder-plus"></i> New Record</h3><br>
+                <form onsubmit="handleFormSubmit(event, 'RECORD')">
+                    <div class="input-group"><label>Client Name</label><input type="text" name="name" required></div>
+                    <div class="input-group"><label>Mobile Number</label><input type="tel" name="mobile" required></div>
+                    <div class="input-group"><label>Full Address</label><textarea name="address"></textarea></div>
+                    <button type="submit" class="submit-btn">Save Entry</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="section-REGISTRY" class="tab-content" style="display: none;">
+            <div class="form-card">
+                <h3><i class="fas fa-id-card"></i> New Registry</h3><br>
+                <form onsubmit="handleFormSubmit(event, 'REGISTRY')">
+                    <div class="input-group"><label>Client Name</label><input type="text" name="name" required></div>
+                    <div class="input-group"><label>Mobile Number</label><input type="tel" name="mobile" required></div>
+                    <div class="input-group"><label>Registry Details</label><textarea name="address" required></textarea></div>
+                    <button type="submit" class="submit-btn">Save Entry</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="section-DUE" class="tab-content" style="display: none;">
+            <div class="form-card">
+                <h3><i class="fas fa-file-invoice-dollar"></i> Due Record</h3><br>
+                <form onsubmit="handleFormSubmit(event, 'DUE')">
+                    <div class="input-group"><label>Client Name</label><input type="text" name="name" required></div>
+                    <div class="input-group"><label>Mobile Number</label><input type="tel" name="mobile" required></div>
+                    <div class="input-group"><label>Due Amount</label><input type="number" name="due" required></div>
+                    <button type="submit" class="submit-btn">Save Entry</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="section-COLLECTION" class="tab-content" style="display: none;">
+            <div class="form-card">
+                <h3><i class="fas fa-hand-holding-usd"></i> Amount Collection</h3><br>
+                <form onsubmit="handleFormSubmit(event, 'COLLECTION')">
+                    <div class="input-group"><label>Collection Date</label><input type="date" name="date" required id="collDate"></div>
+                    <div class="input-group"><label>Amount Received</label><input type="number" name="amount" required></div>
+                    <div class="input-group"><label>Purpose/Note</label><textarea name="purpose" required></textarea></div>
+                    <button type="submit" class="submit-btn" style="background: var(--success);">Confirm Collection</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="section-SETTINGS" class="tab-content" style="display: none;">
+            <div class="form-card">
+                <h3><i class="fas fa-user-cog"></i> Account Settings</h3><br>
+                <div class="input-group"><label>Update Email</label><input type="email" id="updateEmail"><button class="submit-btn" style="margin-top:5px; background: #5a5c69;" onclick="updateAdminEmail()">Save Email</button></div>
+                <hr style="margin: 20px 0;">
+                <div class="input-group"><label>New Password</label><input type="password" id="updatePass"><button class="submit-btn" style="margin-top:5px; background: #5a5c69;" onclick="updateAdminPassword()">Update Password</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBrnlny_90hkDglWOe0baWtJF456q100vc",
+      authDomain: "maladeedwriter.firebaseapp.com",
+      projectId: "maladeedwriter",
+      storageBucket: "maladeedwriter.firebasestorage.app",
+      messagingSenderId: "317543365815",
+      appId: "1:317543365815:web:4c0ca62ce2a3deb69e2132"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const fdb = firebase.firestore();
+
+    const SHEET_URLS = { 
+        'RECORD': "https://script.google.com/macros/s/AKfycbxcyrrPsJsit78dk3v8wwhvX16ixsO0UN7YYN9ZKNwURrB7SHMmxJ4GKlPs4bA2J9IUKw/exec", 
+        'REGISTRY': "https://script.google.com/macros/s/AKfycbyzt4hRr8fLRmjIiNv8heCiE9AByrun5fPdJ60zlb3i5WFNm9lijnNXYc2Pmc7p5hQAtg/exec", 
+        'DUE': "https://script.google.com/macros/s/AKfycbxKccHOf2Qwn7bDoKTD5n1uUGyo9YvjwB1wbzRcQHORmMdp8y0O3RQXhSQx3gtcxSuRkQ/exec",
+        'COLLECTION': "https://script.google.com/macros/s/AKfycbwi21EKx_RUaeFCdcLRjdtFo95e8dWKTbKC1DtVMIHCrNkvd3eX0blZPzBkClqjZq7q/exec" 
+    };
+
+    document.getElementById('filterDate').value = new Date().toISOString().split('T')[0];
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('appWrapper').style.display = 'flex';
+            document.getElementById('profileInfo').innerHTML = `<i class="fas fa-user-circle"></i> ${user.email}`;
+            listenToFirebase(); 
+        } else {
+            document.getElementById('loginSection').style.display = 'flex';
+            document.getElementById('appWrapper').style.display = 'none';
+        }
+    });
+
+    async function handleLogin() {
+        const email = document.getElementById('loginId').value;
+        const pass = document.getElementById('loginPass').value;
+        try { await auth.signInWithEmailAndPassword(email, pass); } catch (e) { alert(e.message); }
+    }
+
+    function handleLogout() { auth.signOut().then(() => location.reload()); }
+
+    function switchTab(e, type) {
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.getElementById('section-' + type).style.display = 'block';
+        if(e && e.currentTarget.classList) e.currentTarget.classList.add('active');
+    }
+
+    async function handleFormSubmit(e, type) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true; btn.innerText = "Syncing...";
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        const entry = { ...data, type: type, date: data.date || new Date().toISOString().split('T')[0], timestamp: firebase.firestore.FieldValue.serverTimestamp() };
+        try {
+            await fdb.collection('crm_data').add(entry);
+            fetch(SHEET_URLS[type], { method: 'POST', mode: 'no-cors', body: JSON.stringify(entry) });
+            alert("Entry Success!"); e.target.reset();
+        } catch (err) { alert(err.message); } finally { btn.disabled = false; btn.innerText = "Save Entry"; }
+    }
+
+    let allData = [];
+    function listenToFirebase() {
+        fdb.collection('crm_data').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+            allData = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+            refreshAdmin();
+        });
+    }
+
+    function refreshAdmin() {
+        const selDate = document.getElementById('filterDate').value;
+        const searchVal = document.getElementById('masterSearch').value.toLowerCase().trim();
+        
+        const filteredData = allData.filter(item => {
+            const nameMatch = (item.name || item.purpose || '').toLowerCase().includes(searchVal);
+            const phoneMatch = (item.mobile || item.due || item.amount || '').toString().includes(searchVal);
+            
+            if (searchVal !== "") {
+                return (nameMatch || phoneMatch);
+            } else {
+                return item.date === selDate;
+            }
+        });
+
+        document.getElementById('statRecord').innerText = filteredData.filter(i=>i.type==='RECORD').length;
+        document.getElementById('statRegistry').innerText = filteredData.filter(i=>i.type==='REGISTRY').length;
+        document.getElementById('statDue').innerText = filteredData.filter(i=>i.type==='DUE').length;
+        document.getElementById('statColl').innerText = filteredData.filter(i=>i.type==='COLLECTION').length;
+
+        const renderTable = (type) => {
+            return filteredData.filter(i => i.type === type).map(item => {
+                if(type === 'DUE') {
+                    return `
+                        <tr>
+                            <td><span style="font-weight:600;">${item.name || '-'}</span></td>
+                            <td style="color:#888;">${item.date}</td>
+                            <td>${item.mobile || '-'}</td>
+                            <td style="color:var(--danger); font-weight:bold;">${item.due || '0'}</td>
+                            <td style="text-align:right;"><i class="fas fa-trash-alt del-btn" onclick="deleteEntry('${item.id}')"></i></td>
+                        </tr>
+                    `;
+                }
+                return `
+                    <tr>
+                        <td><span style="font-weight:600;">${item.name || item.purpose || '-'}</span></td>
+                        <td style="color:#888;">${item.date}</td>
+                        <td>${item.mobile || item.amount || '-'}</td>
+                        <td style="text-align:right;"><i class="fas fa-trash-alt del-btn" onclick="deleteEntry('${item.id}')"></i></td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        document.querySelector('#tableRegistry tbody').innerHTML = renderTable('REGISTRY');
+        document.querySelector('#tableRecord tbody').innerHTML = renderTable('RECORD');
+        document.querySelector('#tableDue tbody').innerHTML = renderTable('DUE');
+        document.querySelector('#tableCollection tbody').innerHTML = renderTable('COLLECTION');
+    }
+
+    function deleteEntry(id) { if(confirm("Are you sure?")) fdb.collection('crm_data').doc(id).delete(); }
+
+    function exportToExcel(type) {
+        const searchVal = document.getElementById('masterSearch').value.trim();
+        const selDate = document.getElementById('filterDate').value;
+        const dataToExport = allData.filter(i => {
+            if(i.type !== type) return false;
+            if(searchVal !== "") return (i.name || i.mobile || i.purpose || '').toString().toLowerCase().includes(searchVal.toLowerCase());
+            return i.date === selDate;
+        });
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, type);
+        XLSX.writeFile(wb, `${type}_Report.xlsx`);
+    }
+
+    async function updateAdminEmail() {
+        const newEmail = document.getElementById('updateEmail').value;
+        if(newEmail) try { await auth.currentUser.updateEmail(newEmail); alert("Updated!"); handleLogout(); } catch(e){ alert(e.message); }
+    }
+
+    async function updateAdminPassword() {
+        const newPass = document.getElementById('updatePass').value;
+        if(newPass) try { await auth.currentUser.updatePassword(newPass); alert("Updated!"); handleLogout(); } catch(e){ alert(e.message); }
+    }
+</script>
+</body>
+</html>
